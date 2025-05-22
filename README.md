@@ -46,7 +46,7 @@ This script enables discrete position control:
 
 ---
 
-### 2. `control_speed.py`
+### 3. `control_speed.py`
 
 Youtube video: https://youtu.be/Zzw3PEGBysM
 
