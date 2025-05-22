@@ -3,6 +3,8 @@ from rclpy.node import Node
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
 import tkinter as tk
+import sys
+import threading
 
 
 class QBHandCommander(Node):
@@ -11,8 +13,8 @@ class QBHandCommander(Node):
 
         self.topic_name = '/qbhand1/qbhand1_synergy_trajectory_controller/joint_trajectory'
         self.joint_name = 'qbhand1_synergy_joint'
-        self.position_command = 0.0
         self.execution_time = 0.5
+
         self.publisher_ = self.create_publisher(JointTrajectory, self.topic_name, 10)
 
     def send_command(self, position: float):
@@ -23,76 +25,93 @@ class QBHandCommander(Node):
         point.positions = [position]
         point.velocities = [0.0]
         point.accelerations = [0.0]
-        point.time_from_start = Duration(sec=int(self.execution_time),
-                                         nanosec=int((self.execution_time % 1) * 1e9))
+        point.time_from_start = Duration(
+            sec=int(self.execution_time),
+            nanosec=int((self.execution_time % 1) * 1e9)
+        )
 
         traj_msg.points.append(point)
         self.publisher_.publish(traj_msg)
-        self.get_logger().info(f"↪️ Command sent: position = {position:.2f}, time = {self.execution_time:.2f} s")
+        self.get_logger().info(f"=> Command sent: position = {position:.2f}, time = {self.execution_time:.2f} s")
+
+
+
+class QBHandGUI:
+    def __init__(self, node: QBHandCommander):
+        self.node = node
+
+        self.window = tk.Tk()
+        self.window.title("QBHand Real-Time Control")
+        self.window.geometry("400x200")
+
+        self.setup_widgets()
+        self.window.bind('<Left>', self.on_key)
+        self.window.bind('<Right>', self.on_key)
+        self.window.focus_set()
+        self.window.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def setup_widgets(self):
+        # Label + entry for execution time
+        tk.Label(self.window, text="Execution time (seconds):").pack()
+        self.time_entry = tk.Entry(self.window)
+        self.time_entry.insert(0, str(self.node.execution_time))
+        self.time_entry.pack()
+
+        # Position slider
+        tk.Label(self.window, text="Position (0.0 - 1.0):").pack()
+        self.pos_slider = tk.Scale(
+            self.window, from_=0.0, to=1.0, resolution=0.01,
+            orient=tk.HORIZONTAL, length=300, command=self.on_slider_move
+        )
+        self.pos_slider.pack()
+
+        self.position_label = tk.Label(self.window, text="Current position: 0.00")
+        self.position_label.pack()
+
+    def on_slider_move(self, value):
+        try:
+            pos = float(value)
+            t = float(self.time_entry.get())
+            if not 0.0 <= pos <= 1.0 or t <= 0.0:
+                return
+            self.node.execution_time = t
+            self.node.send_command(pos)
+            self.position_label.config(text=f"Current position: {pos:.2f}")
+        except ValueError:
+            pass
+
+    def on_key(self, event):
+        current = self.pos_slider.get()
+        step = 0.01
+        if event.keysym == 'Left':
+            self.pos_slider.set(round(max(0.0, current - step), 2))
+        elif event.keysym == 'Right':
+            self.pos_slider.set(round(min(1.0, current + step), 2))
+
+    def run(self):
+        self.window.mainloop()
+
+    def on_close(self):
+        print("🛑 Clean shutdown...")
+        self.window.destroy()
+        self.node.destroy_node()
+        rclpy.shutdown()
+        sys.exit(0)
 
 
 def main(args=None):
     rclpy.init(args=args)
     node = QBHandCommander()
 
-    window = tk.Tk()
-    window.title("QBHand Real-Time Control")
-    window.geometry("400x200")
+    # ROS spin thread
+    spin_thread = threading.Thread(target=rclpy.spin, args=(node,), daemon=True)
+    spin_thread.start()
 
-    # Temps d'exécution
-    tk.Label(window, text="Execution time (seconds):").pack()
-    time_entry = tk.Entry(window)
-    time_entry.insert(0, "0.5")
-    time_entry.pack()
-
-    # Position actuelle
-    tk.Label(window, text="Position (0.0 - 1.0):").pack()
-    pos_slider = tk.Scale(window, from_=0.0, to=1.0, resolution=0.01,
-                          orient=tk.HORIZONTAL, length=300)
-    pos_slider.pack()
-
-    position_label = tk.Label(window, text="Current position: 0.00")
-    position_label.pack()
-
-    # Callback pour envoi de commande
-    def on_slider_move(value):
-        try:
-            pos = float(value)
-            t = float(time_entry.get())
-            if not 0.0 <= pos <= 1.0 or t <= 0:
-                return
-            node.execution_time = t
-            position_label.config(text=f"Current position: {pos:.2f}")
-            node.send_command(pos)
-        except ValueError:
-            pass
-
-    pos_slider.config(command=on_slider_move)
-
-    # ⌨️ Gérer les flèches gauche/droite
-    def on_key(event):
-        current = pos_slider.get()
-        step = 0.01
-        if event.keysym == 'Left':
-            new_val = max(0.0, current - step)
-            pos_slider.set(round(new_val, 2))
-        elif event.keysym == 'Right':
-            new_val = min(1.0, current + step)
-            pos_slider.set(round(new_val, 2))
-
-    window.bind('<Left>', on_key)
-    window.bind('<Right>', on_key)
-
-    # Focus clavier sur la fenêtre
-    window.focus_set()
-
+    gui = QBHandGUI(node)
     try:
-        window.mainloop()
+        gui.run()
     except KeyboardInterrupt:
-        window.destroy()
-        node.destroy_node()
-        pass
-
+        gui.on_close()
 
 
 if __name__ == '__main__':
