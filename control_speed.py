@@ -15,7 +15,7 @@ class QBHandControllerNode(Node):
 
         self.joint_name = 'qbhand1_synergy_joint'
         self.topic_name = '/qbhand1/qbhand1_synergy_trajectory_controller/joint_trajectory'
-        self.state_topic = '/qbhand1/qbhand1_synergy_trajectory_controller/state'
+        self.state_topic = '/qbhand1/qbhand1_synergy_trajectory_controller/controller_state'
 
         self.current_position = 0.0
         self.execution_time = 0.5
@@ -25,8 +25,8 @@ class QBHandControllerNode(Node):
             JointTrajectoryControllerState, self.state_topic, self.listener_callback, 10)
 
     def listener_callback(self, msg):
-        if msg.actual.positions:
-            self.current_position = msg.actual.positions[0]
+        if msg.feedback.positions:
+            self.current_position = msg.feedback.positions[0]
 
     def send_command(self, position: float, time: float):
         traj_msg = JointTrajectory()
