@@ -1,71 +1,86 @@
-# QBHand ROS 2 Control Test Suite
+# QBHand Control Suite (ROS 2 Humble)
 
-This repository contains Python scripts designed to explore and test the motion control capabilities of the QBHand via ROS 2 topics exclusively. These tools allow for position and velocity-based control and facilitate the evaluation of the robot hand’s behavior in various command scenarios.
+A collection of Python scripts to control and test the QBHand using ROS 2, including real-time position and velocity-based control modes. Ideal for experimental evaluation, teaching, and development of ROS-based hand interfaces.
 
-## Prerequisites
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
 
 - ROS 2 Humble installed
-- QBHand properly configured
-- launch bringup_qbhand.launch with:
-```
+- QBHand properly configured and connected
+- Launch the hand interface with the differents scipts
+
+```bash
 cd ~/colcon_ws
 colcon build
 source install/setup.bash
-ros2 launch qb_hand_description bringup_qbhand.launch standalone:=true activate>
+ros2 launch qb_hand_description bringup_qbhand.launch standalone:=true activate:=true
 ```
 
+---
 
-## Files Overview
+## 📦 Included Scripts
 
-### 1. `trackbar.py`
+### 🔘 `trackbar.py` – Real-Time Position Slider Control  
+[▶️ Demo Video](https://youtu.be/Zzw3PEGBysM)
 
-Youtube video: https://youtu.be/Zzw3PEGBysM
+- GUI slider for position command between 0.0 and 1.0
+- Adjustable execution time per command
+- Uses arrow keys or slider to change position
 
-This script allows real-time position control of the QBHand using a graphical trackbar (slider). The user can:
-- Adjust the target position between 0.0 and 1.0 using the slider or arrow keys (left/right).
-- Change the execution time for each motion command.
-
-**Limitations and Future Improvements:**
-- The hand waits until the slider remains still before executing the motion. This results in a non-fluid movement.
-- This delay occurs because the robot pauses briefly each time it receives a new command, even if the change is minimal. This behavior is typical for trajectory controllers expecting discrete goals rather than continuous updates.
-- A potential improvement would be to switch from time-based control to velocity-based control for smoother transitions.
+**Limitations:**
+- Commands are only sent when the slider stops moving
+- Movement is not fluid due to discrete trajectory commands
+- Could be improved by switching to velocity-based control
 
 ---
 
-### 2. `stop_on_command.py`
+### ⏹️ `stop_on_command.py` – [Deprecated]
 
-NOT USEFUL, SEE THE FOLLOWING PYTHON FILE WHICH DOES THE SAME THING
+**Not recommended** — use `control_speed.py` instead.
 
-This script enables discrete position control:
-- The user sets a desired position and execution time.
-- Upon pressing the **"Stop"** button or a specific key (e.g., space bar), the script sends a new trajectory command using the current actual position of the hand.
-
-**How it works:**
-- The controller state is continuously monitored via the `/state` topic.
-- The actual position is extracted and, upon trigger, sent back as a trajectory point to effectively "freeze" the hand in place.
+- Sends a trajectory to "freeze" the hand at its current position when triggered
+- Monitors `/state`, and reuses the current position as a target
 
 ---
 
-### 3. `control_speed.py`
+### 🕹️ `control_speed.py` – Velocity-Based Smooth Control  
+[▶️ Demo Video](https://youtu.be/Zzw3PEGBysM)
 
-Youtube video: https://youtu.be/Zzw3PEGBysM
+- Set target position and motion velocity (units: position/s)
+- Execution time is auto-computed:
+  
+  ```
+  execution_time = abs(target_pos - current_pos) / velocity
+  ```
 
-This script provides **velocity-based control** of the QBHand, with an additional feature to **immediately stop the hand** at its current position.
+- Real-time feedback from `/state`
+- Stop button immediately halts the hand by sending a new goal with the current position
 
-#### Features:
-- The user selects a **target position** and a **velocity** (in position units per second).
-- The script computes the execution time using the formula:
+**Advantages:**
+- Smooth, fluid control
+- Stop feature improves safety and manual testing usability
 
-"execution_time = abs(target_pos - current_pos) / velocity"
+---
 
-- A velocity of `1.0` means the hand moves from 0 to 1 (or vice versa) in exactly 1 second.
-- Pressing the **“Stop”** button sends a new trajectory command using the current position as target, effectively freezing the hand in place.
+## 🧠 How It Works
 
-#### How it works:
-- The current hand position is monitored in real-time via the `/state` topic.
-- As soon as the user adjusts the slider or clicks send, a new trajectory message is published.
-- If the **Stop** button is clicked, the current position is resent as a goal, causing the controller to halt motion.
+All scripts interact with:
+- `/state` (topic): to monitor real-time hand position
+- `/command` (topic): to send `trajectory_msgs/JointTrajectory` goals to the controller
 
-#### Advantages:
-- This control mode offers **dynamic speed regulation** and **real-time responsiveness**.
-- The integrated stop feature improves safety and interaction usability, especially during manual tuning or testing.
+---
+
+
+## 📋 License
+
+This project is licensed under the MIT License.
+
+---
+
+Happy controlling! 🖐️
+
+---
+
